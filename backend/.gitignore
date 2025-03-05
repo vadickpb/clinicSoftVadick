@@ -1,0 +1,27 @@
+# Evita subir dependencias de Node.js
+node_modules/
+package-lock.json
+
+# Archivos de configuración del editor
+.vscode/
+.idea/
+
+# Evita archivos de compilación
+dist/
+build/
+
+# Archivos de entorno (credenciales)
+.env
+.env.local
+.env.development
+.env.production
+
+# Cachés y logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store  # MacOS
+
+# Archivos del sistema
+Thumbs.db  # Windows
