@@ -1,36 +1,24 @@
-// src/models/index.js
-const { Sequelize, DataTypes } = require('sequelize');
-require('dotenv').config();
-
-const sequelize = new Sequelize(
-    process.env.DB_NAME,       // Nombre de la base de datos
-    process.env.DB_USER,       // Usuario de la base de datos
-    process.env.DB_PASSWORD,   // Contraseña
-    {
-        host: process.env.DB_HOST,
-        dialect: process.env.DB_DIALECT, // Ej. 'mysql'
-        pool: {
-            max: 5,
-            min: 0,
-            acquire: 30000,
-            idle: 10000
-        },
-        logging: false  // Deshabilitar logs en producción
-    }
-);
+const { DataTypes } = require('sequelize');
+const { sequelize, testConnection } = require('../config/db'); // Importa la conexión y la prueba
 
 const db = {};
-db.Sequelize = Sequelize;
-db.sequelize = sequelize;
 
-// Cargar modelos
-db.Producto = require('./producto')(sequelize, DataTypes);
+// Importar modelos manualmente
 db.Usuario = require('./usuario')(sequelize, DataTypes);
 db.Paciente = require('./paciente')(sequelize, DataTypes);
+db.Clinica = require('./clinica')(sequelize, DataTypes);
 
-// Ejemplo de asociación: cada Paciente pertenece a un Usuario
+// Definir asociaciones manualmente
 db.Paciente.belongsTo(db.Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
-// Opcional: si deseas que un Usuario tenga un Paciente asociado
 db.Usuario.hasOne(db.Paciente, { foreignKey: 'usuario_id', as: 'paciente' });
+db.Clinica.hasMany(db.Paciente, { foreignKey: 'clinica_id', as: 'pacientes' });
+db.Paciente.belongsTo(db.Clinica, { foreignKey: 'clinica_id', as: 'clinica' });
+
+// Exportamos Sequelize y la conexión
+db.sequelize = sequelize;
+db.Sequelize = require('sequelize');
+
+// Verificar la conexión a la base de datos
+testConnection();
 
 module.exports = db;

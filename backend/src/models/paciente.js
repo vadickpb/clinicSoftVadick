@@ -19,11 +19,6 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.ENUM('masculino', 'femenino', 'otro'),
             allowNull: true
         },
-        identificacion: {
-            type: DataTypes.STRING(50),
-            allowNull: true,
-            unique: true
-        },
         direccion: {
             type: DataTypes.TEXT,
             allowNull: true
