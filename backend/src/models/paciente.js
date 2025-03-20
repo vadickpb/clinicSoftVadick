@@ -8,15 +8,30 @@ module.exports = (sequelize, DataTypes) => {
         },
         usuario_id: {
             type: DataTypes.INTEGER,
-            allowNull: false,
-            unique: true
+            allowNull: true
+        },
+        nombre: {
+            type: DataTypes.STRING(100),
+            allowNull: true
+        },
+        apellido: {
+            type: DataTypes.STRING(100),
+            allowNull: true
+        },
+        tipo_doc: {
+            type: DataTypes.ENUM('DNI', 'CE', 'Pasaporte'),
+            allowNull: true
+        },
+        num_doc: {
+            type: DataTypes.STRING(10),
+            allowNull: true
         },
         fecha_nacimiento: {
             type: DataTypes.DATEONLY,
             allowNull: true
         },
         sexo: {
-            type: DataTypes.ENUM('masculino', 'femenino', 'otro'),
+            type: DataTypes.ENUM('masculino', 'femenino'),
             allowNull: true
         },
         direccion: {
@@ -27,11 +42,10 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(100),
             allowNull: true
         },
-        estado: {
+        pais: {
             type: DataTypes.STRING(100),
             allowNull: true
-        },
-        pais: {
+        },  estado: {
             type: DataTypes.STRING(100),
             allowNull: true
         }

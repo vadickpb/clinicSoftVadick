@@ -1,18 +1,55 @@
-// src/controllers/user.controller.js
 const db = require('../models');
 const Usuario = db.Usuario;
 const { sequelize } = db;
+const { Op } = require('sequelize');
 
-// Listar usuarios con paginación y Content-Range
+const bcrypt = require('bcrypt');
+
+
 exports.getUsers = async (req, res) => {
   try {
-    // Parámetros de paginación: page y perPage (React-Admin los enviará)
-    const { page = 1, perPage = 10 } = req.query;
+    const { page = 1, perPage = 10, filter = {} } = req.query;
     const limit = parseInt(perPage, 10);
     const offset = (parseInt(page, 10) - 1) * limit;
+    const parsedFilter = JSON.parse(filter);
 
-    // findAndCountAll devuelve tanto filas como el total
-    const result = await Usuario.findAndCountAll({ offset, limit });
+    const whereCondition = {};
+    if (parsedFilter.q) {
+      const search = `%${parsedFilter.q}%`;
+      whereCondition[Op.or] = [
+        { nombre: { [Op.like]: search } },
+        { apellido: { [Op.like]: search } },
+        { email: { [Op.like]: search } },
+        { telefono: { [Op.like]: search } },
+      ];
+    }
+
+    if (parsedFilter.nombre) {
+      whereCondition.nombre = { [Op.like]: `%${parsedFilter.nombre}%` };
+    }
+
+    if (parsedFilter.apellido) {
+      whereCondition.apellido = { [Op.like]: `%${parsedFilter.apellido}%` };
+    }
+
+    if (parsedFilter.email) {
+      whereCondition.email = { [Op.like]: `%${parsedFilter.email}%` };
+    }
+
+    if (parsedFilter.telefono) {
+      whereCondition.telefono = { [Op.like]: `%${parsedFilter.telefono}%` };
+    }
+    
+
+    const result = await Usuario.findAndCountAll({ 
+      where: whereCondition,
+      include: [{
+        model: db.Role,
+        as: 'roles',
+        attributes: ['id', 'nombre'],
+      }],
+      offset, 
+      limit });
     const total = result.count;
     const users = result.rows;
 
@@ -27,15 +64,28 @@ exports.getUsers = async (req, res) => {
   }
 };
 
-// Obtener un usuario por ID
+
+
 exports.getUserById = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await Usuario.findByPk(id);
+    const user = await Usuario.findByPk(id, {
+      include: [{
+        model: db.Role,
+        as: 'roles',
+        attributes: ['id', 'nombre'],
+        through: { attributes: [] } // importante para no traer datos extra
+      }]
+    });
     if (!user) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
-    res.json(user);
+
+    // Convertir roles a arreglo de IDs
+    const userPlain = user.get({ plain: true });
+    userPlain.roles = userPlain.roles.map(rol => rol.id);
+
+    res.json(userPlain);
   } catch (error) {
     console.error('Error al obtener usuario:', error);
     res.status(500).json({ error: error.message });
@@ -46,7 +96,10 @@ exports.getUserById = async (req, res) => {
 exports.createUser = async (req, res) => {
   try {
     const { nombre, apellido, email, telefono, password } = req.body;
-    const newUser = await Usuario.create({ nombre, apellido, email, telefono, password });
+    // Encriptar la contraseña con 10 salt rounds
+    const password_hash = await bcrypt.hash(password, 10);
+    // Crear el usuario usando la contraseña encriptada
+    const newUser = await Usuario.create({ nombre, apellido, email, telefono, password: password_hash });
     res.status(201).json(newUser);
   } catch (error) {
     console.error('Error al crear usuario:', error);
@@ -55,23 +108,70 @@ exports.createUser = async (req, res) => {
 };
 
 // Actualizar un usuario
+// exports.updateUser = async (req, res) => {
+//   console.log(req.body);
+
+//   try {
+//     const { id } = req.params;
+//     console.log(req.body);
+//     const { nombre, apellido, email, telefono, password, roles } = req.body;
+
+//     const user = await Usuario.findByPk(id);
+//     if (!user) {
+//       return res.status(404).json({ error: 'Usuario no encontrado' });
+//     }
+//     await user.update({ nombre, apellido, email, telefono, password });
+//     res.json(user);
+//   } catch (error) {
+//     console.error('Error al actualizar usuario:', error);
+//     res.status(500).json({ error: error.message });
+//   }
+// };
+
+// backend/src/controllers/user.controller.js
+
+
 exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, apellido, email, telefono, tipo, password } = req.body;
+    const { nombre, apellido, email, telefono, password, roles } = req.body;
+
+    // Buscar el usuario por su ID
     const user = await Usuario.findByPk(id);
     if (!user) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
-    await user.update({ nombre, apellido, email, telefono, password });
-    res.json(user);
+
+    // Preparar los datos básicos a actualizar
+    const updateData = { nombre, apellido, email, telefono };
+    if (password) {
+      // Encriptar la nueva contraseña
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    // Actualizar los datos básicos del usuario
+    await user.update(updateData);
+
+    if (roles && Array.isArray(roles)) {
+      const rolesIds = roles.map(r => (typeof r === 'object' ? r.id : r));
+      await user.setRoles(rolesIds);
+    }
+
+    const updatedUser = await Usuario.findByPk(id, {
+      include: [{
+        model: db.Role,
+        as: 'roles',
+        attributes: ['id', 'nombre']
+      }]
+    });
+
+    res.json(updatedUser);
   } catch (error) {
     console.error('Error al actualizar usuario:', error);
     res.status(500).json({ error: error.message });
   }
 };
 
-// Eliminar un usuario
 exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -101,7 +201,7 @@ exports.mantenimientoUsuario = async (req, res) => {
     );
 
     if (accion === 'L') {
-      return res.json({ success: true, data: result }); // Devolver la lista completa sin modificaciones
+      return res.json({ success: true, data: result }); 
     }
 
     if (['A', 'U', 'R'].includes(accion)) {
